@@ -26,6 +26,7 @@ xCoordinate: .word 0x00000
 yCoordinate: .word 0x0000c
 absoluteZeroState:	.word 0x000000	# 1 if special ability Absolute Zero is active, 0 if not
 absoluteZeroCounter:	.word 0x000000	# Determines how long to stay in Absolute Zero mode
+shipHitBoxes:	.word 0, 8, 40, 48, 1044, 1540, 1552, 1568, 1588, 2068, 3072, 3080, 3108, 3120
 .text
 lw $s0, displayAddress # $s0 stores the base address for display, immutable
 #$s0 stores base address
@@ -116,6 +117,14 @@ jal drawLaser			# If a laser is present, erase it from the current position
 jal moveLaser			# Move the laser to its new position
 lw $a0, red
 jal drawLaser			# Redraw the laser in its new position
+
+### Check for collisions with laser
+addi $t5, $s6, 0
+lw $t8, ($t5)
+beq $t8, 0, skipCheckingLaserCollisions
+jal checkLaserCollisions
+skipCheckingLaserCollisions:
+jal checkShipCollisions
 lw $a0, black
 jal despawnLaser		# Despawn laser if it reached the right end of the screen, or collided with an obstacle
 jal levelCheck			# Check if player has survived long enough to advance to a harder difficulty
@@ -330,6 +339,177 @@ jal drawLaser
 laserCurrentlyActive:
 j keyPressed
 
+checkShipCollisions:
+addi $t5, $s6, 0	# Get address of array index
+lw $t0, shipAddress	# Get ship address and store in $t0
+addi $t7, $0, 0		# store indices for obstacles
+addi $t6, $0, 4
+mult $t6, $s5		# Multiply number of max enemies * 4
+mflo $t6
+checkObstacleShip:	
+beq $t7, $t6, checkedAllObstacleShip
+add $t8, $s1, $t7		# Put address of element of 'obstacles' at index $t7 / 4 in $t8
+lw $t9, ($t8) 			# Load in the corresponding element of 'obstacles' into $t9
+ble $t9, $0, noShipCollision	# If element is less than or equal to 0, this is an empty slot and we don't need to do anything to it
+
+la $t1, shipHitBoxes
+addi $t2, $0, 0			# To iterate through array of hitboxes
+# Now check each key point of ship to see if we hit an obstacle:
+# Check if top right of ship hits an obstacle
+checkEachHitbox:
+bge $t2, 56, noShipCollision
+add $t4, $t1, $t2
+lw $t4, ($t4)
+add $t3, $t0, $t4		# Location of hitbox of ship
+addi $t4, $t9, 0		# Location of left end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 512		# Location of left end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1024		# Location of left end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1536		# Location of left end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 2048		# Location of left end of obstacle
+beq $t4, $t3, obstacleHit
+
+addi $t4, $t9, 4		# Location of left middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 516		# Location of left middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1028		# Location of left middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1540		# Location of left middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 2052		# Location of left middle end of obstacle
+beq $t4, $t3, obstacleHit
+
+addi $t4, $t9, 8		# Location of middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 520		# Location of middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1032		# Location of middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1544		# Location of middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 2056		# Location of middle end of obstacle
+beq $t4, $t3, obstacleHit
+
+addi $t4, $t9, 12		# Location of right middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 524		# Location of right middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1036		# Location of right middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1548		# Location of right middle end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 2060		# Location of right middle end of obstacle
+beq $t4, $t3, obstacleHit
+
+addi $t4, $t9, 16		# Location of right end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 528		# Location of right end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1040		# Location of right end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 1552		# Location of right end of obstacle
+beq $t4, $t3, obstacleHit
+addi $t4, $t9, 2064		# Location of right end of obstacle
+beq $t4, $t3, obstacleHit
+
+addi $t2, $t2, 4
+
+j checkEachHitbox
+
+noShipCollision:		# Come here if no collision occurs at all
+addi $t7, $t7, 4	# Go check next obstacle in array
+j checkObstacleShip
+
+obstacleHit:
+lw $t7, black		# Erase the whole obstacle
+sw $t7, 0($t9)
+sw $t7, 4($t9)
+sw $t7, 8($t9)
+sw $t7, 12($t9)
+sw $t7, 16($t9)
+
+sw $t7, 512($t9)
+sw $t7, 516($t9)
+sw $t7, 520($t9)
+sw $t7, 524($t9)
+sw $t7, 528($t9)
+
+sw $t7, 1024($t9)
+sw $t7, 1028($t9)
+sw $t7, 1032($t9)
+sw $t7, 1036($t9)
+sw $t7, 1040($t9)
+
+sw $t7, 1536($t9)
+sw $t7, 1540($t9)
+sw $t7, 1544($t9)
+sw $t7, 1548($t9)
+sw $t7, 1552($t9)
+
+sw $t7, 2048($t9)
+sw $t7, 2052($t9)
+sw $t7, 2056($t9)
+sw $t7, 2060($t9)
+sw $t7, 2064($t9)
+
+sw $0, ($t8)		# Reset this obstacle to 0 to delete it
+
+# Ship takes damage
+addi $t5, $s6, 4	# Get index for HP Bar element in 'otherAddresses'
+lw $t8, ($t5)		# Get address of current HP bar and store it in $t8
+add $t8, $t8, -40	# Subtract 10 units off the HP bar (total is 60 units, so ship can take 6 hits)
+lw $a0, black
+# Erase portion of HP Bar
+sw $t7, 40($t8)
+sw $t7, 552($t8)
+sw $t7, 1064($t8)
+sw $t7, 36($t8)
+sw $t7, 548($t8)
+sw $t7, 1060($t8)
+sw $t7, 32($t8)
+sw $t7, 544($t8)
+sw $t7, 1056($t8)
+sw $t7, 28($t8)
+sw $t7, 540($t8)
+sw $t7, 1052($t8)
+sw $t7, 24($t8)
+sw $t7, 536($t8)
+sw $t7, 1048($t8)
+sw $t7, 20($t8)
+sw $t7, 532($t8)
+sw $t7, 1044($t8)
+sw $t7, 16($t8)
+sw $t7, 528($t8)
+sw $t7, 1040($t8)
+sw $t7, 12($t8)
+sw $t7, 524($t8)
+sw $t7, 1036($t8)
+sw $t7, 8($t8)
+sw $t7, 520($t8)
+sw $t7, 1032($t8)
+sw $t7, 4($t8)
+sw $t7, 516($t8)
+sw $t7, 1028($t8)
+sw $t7, 0($t8)
+sw $t7, 512($t8)
+sw $t7, 1024($t8)
+
+sw $t8, ($t5)
+addi $t5, $s0, 29748
+beq $t5, $t8, GAMEOVER
+
+######
+sw $t0, shipAddress
+jr $ra			# Return since laser can only hit 1 obstacle
+checkedAllObstacleShip:
+sw $t0, shipAddress
+jr $ra		
+
+
 drawLaser:
 addi $t5, $s6, 0
 lw $t8, ($t5)
@@ -341,6 +521,161 @@ sw $a0, 12($t8)
 sw $a0, 16($t8)
 noLasers:
 jr $ra
+
+moveLaser:
+addi $t5, $s6, 0
+lw $t8, ($t5)
+beq $t8, 0, noLaserActive
+beq $s7, 1, fireModeActive
+addi $t8, $t8, 8
+j storeNewLaserPosition
+fireModeActive:
+addi $t8, $t8, 16
+storeNewLaserPosition:
+sw $t8, ($t5)
+noLaserActive:
+jr $ra
+
+despawnLaser:
+addi $t5, $s6, 0	# Get address of array index
+lw $t8, ($t5)		# Get laser address
+addi $t7, $t8, -496	# Check if laser address is at edge of right side of screen
+addi $t6, $0, 512
+div $t7, $t6
+mfhi $t7
+beq $t7, 0, eraseTheLaser
+beq $t7, 8, eraseTheLaser
+j laserStillActive
+eraseTheLaser:
+sw $a0, 0($t8)
+sw $a0, 4($t8)
+sw $a0, 8($t8)
+sw $a0, 12($t8)
+sw $a0, 16($t8)
+sw $0, ($t5)
+
+laserStillActive:
+jr $ra
+
+checkLaserCollisions:
+addi $t5, $s6, 0	# Get address of array index
+lw $t0, ($t5)		# Get laser address and store in $t0
+addi $t7, $0, 0		# store indices for obstacles
+addi $t6, $0, 4
+mult $t6, $s5		# Multiply number of max enemies * 4
+mflo $t6
+checkAsteroidLaser:	
+beq $t7, $t6, checkedAllAsteroidLaser
+add $t8, $s1, $t7	# Put address of element of 'obstacles' at index $t7 / 4 in $t8
+lw $t9, ($t8) 		# Load in the corresponding element of 'obstacles' into $t9
+ble $t9, $0, noCollision	# If element is less than or equal to 0, this is an empty slot and we don't need to do anything to it
+
+addi $t4, $t0, 20
+
+# Check if front end of laser hits an obstacle
+addi $t4, $t9, 0		# Location of left end of obstacle
+addi $t3, $t0, 16		# Location of right end of laser
+beq $t4, $t3, laserHit
+addi $t4, $t9, 512		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1024		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1536		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 2048		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+
+addi $t4, $t9, 4		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 516		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1028		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1540		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 2052		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+
+addi $t4, $t9, 8		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 520		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1032		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1544		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 2056		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+
+addi $t4, $t9, 12		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 524		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1036		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1548		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 2060		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+
+addi $t4, $t9, 16		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 528		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1040		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 1552		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+addi $t4, $t9, 2064		# Location of left end of obstacle
+beq $t4, $t3, laserHit
+
+noCollision:		# Come here if no collision occurs at all
+addi $t7, $t7, 4	# Go check next obstacle in array
+j checkAsteroidLaser
+
+laserHit:
+lw $t7, black		# Erase the whole obstacle
+sw $t7, 0($t9)
+sw $t7, 4($t9)
+sw $t7, 8($t9)
+sw $t7, 12($t9)
+sw $t7, 16($t9)
+
+sw $t7, 512($t9)
+sw $t7, 516($t9)
+sw $t7, 520($t9)
+sw $t7, 524($t9)
+sw $t7, 528($t9)
+
+sw $t7, 1024($t9)
+sw $t7, 1028($t9)
+sw $t7, 1032($t9)
+sw $t7, 1036($t9)
+sw $t7, 1040($t9)
+
+sw $t7, 1536($t9)
+sw $t7, 1540($t9)
+sw $t7, 1544($t9)
+sw $t7, 1548($t9)
+sw $t7, 1552($t9)
+
+sw $t7, 2048($t9)
+sw $t7, 2052($t9)
+sw $t7, 2056($t9)
+sw $t7, 2060($t9)
+sw $t7, 2064($t9)
+
+sw $0, ($t8)		# Reset this obstacle to 0 to delete it
+
+sw $t7, 0($t0)		# Erase the laser
+sw $t7, 4($t0)
+sw $t7, 8($t0)
+sw $t7, 12($t0)
+sw $t7, 16($t0)
+sw $0, ($t5)		# Reset laser to 0 to delete it
+jr $ra			# Return since laser can only hit 1 obstacle
+checkedAllAsteroidLaser:
+jr $ra		
 
 checkShipForm:
 beq $s7, 0, ICE
@@ -649,7 +984,7 @@ lw $t6, ($t5)		# Load in the corresponding speed of obstacle into $t6
 ble $t9, $0, noHunter	# If element is less than or equal to 0, this is an empty slot and we don't need to do anything to it
 # Make obstacles randomly move 1 time left, up, or down based on their speed in the speed array
 lw $t0, shipAddress
-add $v0, $t0, 1536
+add $v0, $t0, 1024
 sub $v0, $t9, $v0
 bgt $v0, 0, huntUp
 blt $v0, 0, huntDown
@@ -724,47 +1059,12 @@ sw $a0, ($t8)		# Store address of object into that empty slot in 'obstacles'
 getRandomSpeed:
 li $v0, 42 		# Service 42, random int range
 li $a0, 0		# Select random generator 0	
-li $a1, 4 		# Select upper bound of random number
+li $a1, 2 		# Select upper bound of random number
 syscall	
 addi $a0, $a0, 1	# Add 1 so we don't generate speeds of 0
-beq $a0, 3, getRandomSpeed	# If speed is 3, get another speed since game only allows speeds of 1,2, and 4
+#beq $a0, 3, getRandomSpeed	# If speed is 3, get another speed since game only allows speeds of 1,2, and 4
 sw $a0, ($t5)		# Load speed into speed array
 finishedLooping:
-jr $ra
-
-moveLaser:
-addi $t5, $s6, 0
-lw $t8, ($t5)
-beq $t8, 0, noLaserActive
-beq $s7, 1, fireModeActive
-addi $t8, $t8, 8
-j storeNewLaserPosition
-fireModeActive:
-addi $t8, $t8, 16
-storeNewLaserPosition:
-sw $t8, ($t5)
-noLaserActive:
-jr $ra
-
-despawnLaser:
-addi $t5, $s6, 0	# Get address of array index
-lw $t8, ($t5)		# Get laser address
-addi $t7, $t8, -496	# Check if laser address is at edge of right side of screen
-addi $t6, $0, 512
-div $t7, $t6
-mfhi $t7
-beq $t7, 0, eraseTheLaser
-beq $t7, 8, eraseTheLaser
-j laserStillActive
-eraseTheLaser:
-sw $a0, 0($t8)
-sw $a0, 4($t8)
-sw $a0, 8($t8)
-sw $a0, 12($t8)
-sw $a0, 16($t8)
-sw $0, ($t5)
-
-laserStillActive:
 jr $ra
 
 chargeEnergy:
