@@ -1,12 +1,51 @@
-# Matthew Zhu, zhumatt2
-# Demo for painting
-## Bitmap Display Configuration:
-# - Unit width in pixels: 4
-# - Unit height in pixels: 4
-# - Display width in pixels: 512
-# - Display height in pixels: 256
-# - Base Address for Display: 0x10008000 ($gp)
+#####################################################################
 #
+# CSC258 Summer 2021 Assembly Final Project
+# University of Toronto
+#
+# Student: Matthew Zhu, 1006209103, zhumatt2
+#
+# Bitmap Display Configuration:
+# -Unit width in pixels: 4
+# -Unit height in pixels: 4
+# -Display width in pixels: 512 
+# -Display height in pixels: 256
+# -Base Address for Display: 0x10008000 ($gp)
+#
+# Which milestones have been reached in this submission?
+# (See the assignment handout for descriptions of the milestones)
+# - All milestones have been reached
+#
+# Which approved features have been implemented for milestone 3?
+# (See the assignment handout for the list of additional features)
+# 1. Different levels - a total of 7 levels. Each level is progressively harder with more obstacles/enemies than the last, sometimes even getting new types of enemies
+# 2. Increase in difficulty as the game progresses, including a gradual increase in number of enemies and new types of enemies appear.
+# 3. Ship Abilities: The ship can change forms, and each form has both a passive ability and an ultimate ability that the player can activate to assist in survival
+# 4. Enemy ships: Alongside the Asteroid obstacles, there are two types of enemy ships: the Berserker that has erratic, random movement, and the Hunter that tracks and moves towards the player's ship
+# 5. Shoot obstacles/enemy ships: the ship has a laser cannon attached that allows the ship to shoot laser beams to destroy obstacles/enemies
+# 
+#
+# Link to video demonstration for final submission:
+# - https://www.youtube.com/watch?v=IFddUS0m104
+#
+# Are you OK with us sharing the video with people outside course staff?
+# - Yes
+#
+# Any additional information that the TA needs to know:
+# - See attached README file for a more in-depth explanation of abilities and controls. Basic controls are outlined as follows:
+# W - Move Up
+# A - Move Left
+# S - Move Down
+# D - Move Right
+# P - Restart Game
+# Space - Shoot
+# 1 - Switch to Blue Form
+# 2 - Switch to Red Form
+# 3 - Switch to Yellow Form
+# X - Activate ship's active ability
+
+######################################################################
+
 .data
 displayAddress: .word 0x10008000
 blue: 	.word 0x2c85ff 		# stores the blue colour code
@@ -29,14 +68,6 @@ absoluteZeroCounter:	.word 0x000000	# Determines how long to stay in Absolute Ze
 shipHitBoxes:	.word 0, 8, 40, 48, 1044, 1540, 1552, 1568, 1588, 2068, 3072, 3080, 3108, 3120
 .text
 lw $s0, displayAddress # $s0 stores the base address for display, immutable
-#$s0 stores base address
-#$s1 stores obstacle array
-#$s2 stores speed array for obstacles
-#$s3 stores speed of player ship
-#$s4 stores current number of enemies
-#$s5 stores max number of enemies
-#$s6 stores location of laser if one is present
-#$s7 stores the ship's form: 0 is ICE, 1 is FIRE, 2 is SHOCK
 
 INITIALIZE:
 lw $a0, black
@@ -140,13 +171,26 @@ singleCharge:
 jal chargeEnergy		# Charge the energy bar as per usual
 doNotCharge:
  
-
 li $v0, 32
 li $a0, 40			# SLEEP
 syscall
 j Start
 
 DONE:
+
+tryAgainLoop:
+# Check for user input
+li $t9, 0xffff0000 
+lw $t8, 0($t9)
+beq $t8, 1, checkForP
+j tryAgainLoop
+checkForP:
+lw $t6, 4($t9)
+beq $t6, 0x70, eraseAndRestart
+beq $t6, 0x78, Exit
+j tryAgainLoop
+
+
 Exit:
 li $v0, 10 			# terminate the program gracefully
 syscall
@@ -162,7 +206,6 @@ beq $t6, 0x70, eraseAndRestart
 beq $t6, 0x31, changeToBlue
 beq $t6, 0x32, changeToRed
 beq $t6, 0x33, changeToYellow
-beq $t6, 0x2d, sabotageShip
 beq $t6, 0x78, specialAbility
 j keyPressed
 
@@ -223,10 +266,6 @@ addi $t9, $s0, 30060	# Reset energy bar to 0
 jal eraseEnergyBar
 sw $t9, ($t5)		# Get address of current Energy bar and store it in $t8
 tooFarForward:
-j keyPressed
-
-sabotageShip:
-jal damagedShip
 j keyPressed
 
 changeToBlue:
