@@ -32,6 +32,7 @@
 # - Yes
 #
 # Any additional information that the TA needs to know:
+# While this file seems very large, I would say about half the lines of code are dedicated to just drawing the HUD (HP and Energy Bar sections) and GAME OVER screens.
 # - See attached README file for a more in-depth explanation of abilities and controls. Basic controls are outlined as follows:
 # W - Move Up
 # A - Move Left
@@ -2287,10 +2288,4 @@ j HUD_LOOP10
 HUD_DONE:
 jr $ra
 
-ENDGAME:
-# cehck for input!
-
 j DONE
-
-
-
