@@ -34,16 +34,16 @@
 # Any additional information that the TA needs to know:
 # While this file seems very large, I would say about half the lines of code are dedicated to just drawing the HUD (HP and Energy Bar sections) and GAME OVER screens.
 # - See attached README file for a more in-depth explanation of abilities and controls. Basic controls are outlined as follows:
-# W - Move Up
-# A - Move Left
-# S - Move Down
-# D - Move Right
-# P - Restart Game
-# Space - Shoot
+# w - Move Up
+# a - Move Left
+# s - Move Down
+# d - Move Right
+# p - Restart Game
+# Spacebar - Shoot
 # 1 - Switch to Blue Form
 # 2 - Switch to Red Form
 # 3 - Switch to Yellow Form
-# X - Activate ship's active ability
+# x - Activate ship's active ability
 
 ######################################################################
 
@@ -83,7 +83,7 @@ addi $t1, $0, 0			# store current x-coordinate of ship
 addi $t2, $0, 12		# store current y-coordinate of ship
 sw $t1, xCoordinate
 sw $t2, yCoordinate
-addi $s5, $0, 3			# start game with 3 enemies maximum
+addi $s5, $0, 3			# Store max enemies at a time in $s5, start game with 3 enemies maximum
 lw $t3, gameCounter
 addi $t3, $0, 0			# Set game counter to 0.
 sw $t3, gameCounter
@@ -91,7 +91,10 @@ sw $t3, gameCounter
 la $s1, obstacles		# load array of obstacles into $s1
 la $s2, speeds			# load array of obstacle speeds into $s2
 la $s6, otherAddresses		# load array of other addresses (laser, HP bar, energy bar) into $s6
-# Initialize values for $s6
+# Initialize values for the otherAddress array
+addi $t6, $s6, 0		# Get address of first index in 'otherAddresses'
+addi $t7, $0, 0
+sw $t7, ($t6)			# Reset the laser address to 0 since no lasers on initialiation
 addi $t6, $s6, 4		# Get address of second index of 'otherAddresses'
 addi $t7, $s0, 29988 		# This is the address of full HP Bar
 sw $t7, ($t6)			# Store address of HP Bar in the second index of 'otherAddresses'
@@ -99,9 +102,9 @@ addi $t6, $s6, 8		# This is the address of third index of 'otherAddresses'
 addi $t7, $s0, 30060 		# This is address of an empty Energy Bar
 sw $t7, ($t6)			# Store address of Energy bar in the third index of 'otherAddresses'
 
-addi $s3, $0, 2 		# Initialize speed of plane to 2
-addi $s4, $0, 0			# Start of game has 0 enemies on the screen
-addi $s7, $0, 0			# Default ship form is ICE/Blue form
+addi $s3, $0, 2 		# Store speed of plane in $s3, initialize speed of plane to 2
+addi $s4, $0, 0			# Store number of enemies on the screen in $s4, start of game has 0 enemies on the screen
+addi $s7, $0, 0			# Store ship's form in $s7, default ship form is ICE/Blue form (1=Blue, 2=Red, 3=Yellow)
 jal resetArray			# Reset our obstacles array in case we have existing values
 
 Start:
@@ -132,7 +135,7 @@ jal addNewEnemy			# Add new enemy to the 'obstacle' array, and add its correspon
 enemiesCappedOut:		# Don't bother spawning anything, max obstacles reached already
 lw $a0, black
 lw $a1, black
-lw $t0, absoluteZeroState
+lw $t0, absoluteZeroState	# Check if game is in Absolute Zero (special ability) state
 beq $t0, 1, obstaclesFrozen
 jal drawObstacles		# Erase obstacles in the current positions
 jal moveObstacles		# Move obstacles to new position
@@ -140,7 +143,7 @@ lw $a0, gray
 lw $a1, red
 jal drawObstacles		# Redraw obstacles our obstacles
 obstaclesFrozen:
-jal sustainAbsoluteZero		# Check if Absolute Zero should still be active
+jal sustainAbsoluteZero		# Check if Absolute Zero should still be active or not
 lw $a0, black		
 lw $a1, black
 jal despawnObstacles		# Despawn obstacles that reach left of screen, got shot, or collided with ship
@@ -150,20 +153,20 @@ jal moveLaser			# Move the laser to its new position
 lw $a0, red
 jal drawLaser			# Redraw the laser in its new position
 
-### Check for collisions with laser
+# Check for collisions with laser
 addi $t5, $s6, 0
 lw $t8, ($t5)
-beq $t8, 0, skipCheckingLaserCollisions
-jal checkLaserCollisions
+beq $t8, 0, skipCheckingLaserCollisions		# Skip checking laser collisions if no laser is present
+jal checkLaserCollisions			# Check laser collisions
 skipCheckingLaserCollisions:
-jal checkShipCollisions
+jal checkShipCollisions				# Check if ship has collided with any obstacle/enemy
 lw $a0, black
 jal despawnLaser		# Despawn laser if it reached the right end of the screen, or collided with an obstacle
 jal levelCheck			# Check if player has survived long enough to advance to a harder difficulty
 
-addi $t7, $0, 30			# This is the number of game cycles it will take to charge the energy bar 1 unit
+addi $t7, $0, 30		# This is the number of game cycles it will take to charge the energy bar 1 unit
 lw $t3, gameCounter
-div $t3, $t7
+div $t3, $t7	
 mfhi $t7
 bnez $t7, doNotCharge		
 bne $s7, $0, singleCharge	# If not equal to 0, then not in blue form and we only do a single energy charge
@@ -173,7 +176,7 @@ jal chargeEnergy		# Charge the energy bar as per usual
 doNotCharge:
  
 li $v0, 32
-li $a0, 40			# SLEEP
+li $a0, 40			# Sleep
 syscall
 j Start
 
@@ -183,14 +186,13 @@ tryAgainLoop:
 # Check for user input
 li $t9, 0xffff0000 
 lw $t8, 0($t9)
-beq $t8, 1, checkForP
+beq $t8, 1, checkForP		# Check if user inputted 'p'
 j tryAgainLoop
-checkForP:
+checkForP:			# If user inputs 'p', restart the game
 lw $t6, 4($t9)
-beq $t6, 0x70, eraseAndRestart
-beq $t6, 0x78, Exit
+beq $t6, 0x70, eraseAndRestart	
+beq $t6, 0x78, Exit		# If user inputs 'x', exit the game
 j tryAgainLoop
-
 
 Exit:
 li $v0, 10 			# terminate the program gracefully
@@ -198,25 +200,25 @@ syscall
 
 checkWhichInput:
 lw $t6, 4($t9)
-beq $t6, 0x61, boundedLeft
-beq $t6, 0x64, boundedRight
-beq $t6, 0x77, boundedAbove
-beq $t6, 0x73, boundedBelow
-beq $t6, 0x20, shoot
-beq $t6, 0x70, eraseAndRestart
-beq $t6, 0x31, changeToBlue
-beq $t6, 0x32, changeToRed
-beq $t6, 0x33, changeToYellow
-beq $t6, 0x78, specialAbility
+beq $t6, 0x61, boundedLeft	# Move Left with 'a'
+beq $t6, 0x64, boundedRight 	# Move Right with 'd'
+beq $t6, 0x77, boundedAbove	# Move Up with 'w'
+beq $t6, 0x73, boundedBelow	# Move Down with 's'
+beq $t6, 0x20, shoot		# Shoot Laser with spacebar
+beq $t6, 0x70, eraseAndRestart	# Restart the game with 'p'
+beq $t6, 0x31, changeToBlue	# Change to blue form with '1'
+beq $t6, 0x32, changeToRed	# Change to red form with '2'
+beq $t6, 0x33, changeToYellow	# Change to yellow form with '3'
+beq $t6, 0x78, specialAbility	# Activate special ability with 'x'
 j keyPressed
 
 specialAbility:
 addi $t5, $s6, 8	# Get index for Energy Bar element in 'otherAddresses'
 lw $t8, ($t5)		# Get address of current Energy bar and store it in $t8
-bne $t8, 1, notFullyCharged
-beq $s7, 0, absoluteZero
-beq $s7, 1, solarFlare
-beq $s7, 2, blink
+bne $t8, 1, notFullyCharged	# If energy bar not full, skip all this and don't activate ability
+beq $s7, 0, absoluteZero	# If ship is blue form, use Absolute Zero
+beq $s7, 1, solarFlare		# If ship is red form, use Solar Flare
+beq $s7, 2, blink		# If ship is yellow form, use Blink! 
 notFullyCharged:
 j keyPressed
 
@@ -233,10 +235,10 @@ lw $t0, absoluteZeroState
 beq $t0, 1, chargeAbsoluteZero	# If 1, charge. If 0, don't need to do anything
 jr $ra
 chargeAbsoluteZero:
-lw $t1, absoluteZeroCounter
+lw $t1, absoluteZeroCounter	# Increase counter for how long Absolute Zero has been active
 addi $t1, $t1, 1
 sw $t1, absoluteZeroCounter
-beq $t1, 50, turnOffAbsoluteZero
+beq $t1, 50, turnOffAbsoluteZero	# If Abs. Zero counter is 50, then turn it off and reset the counter to 0
 jr $ra
 turnOffAbsoluteZero:
 addi $t0, $0, 0
@@ -255,33 +257,33 @@ addi $t5, $s6, 8	# Get index for Energy Bar element in 'otherAddresses'
 sw $t9, ($t5)		# Get address of current Energy bar and store it in $t8
 j keyPressed
 
-blink:			# Player teleports 1/4 of the screen to the right, or less if there's not enough screen space to the right
+blink:			# Player teleports about half of the screen to the right, or less if there's not enough screen space to the right
 lw $t1, xCoordinate
-bge $t1, 64, tooFarForward
+bge $t1, 64, tooFarForward	# If player is too far to the right already, ability wil not activate
 addi $t1, $t1, 48
-sw $t1, xCoordinate
+sw $t1, xCoordinate	# Update x-coordinates of ship
 lw $t0, shipAddress
 addi $t0, $t0, 192
 sw $t0, shipAddress
 addi $t9, $s0, 30060	# Reset energy bar to 0
-jal eraseEnergyBar
+jal eraseEnergyBar	
 sw $t9, ($t5)		# Get address of current Energy bar and store it in $t8
 tooFarForward:
 j keyPressed
 
 changeToBlue:
-add $s7, $0, 0
+add $s7, $0, 0		# Switch ship form to Blue
 j keyPressed
 
 changeToRed:
-lw $t0, absoluteZeroState  	# $t0 will store the address of the ship
+lw $t0, absoluteZeroState  	# If Absolute Zero is not active, switch to Red form
 beq $t0, 1, noRedChange
 add $s7, $0, 1
 noRedChange:
 j keyPressed
 
 changeToYellow:
-lw $t0, absoluteZeroState  	# $t0 will store the address of the ship
+lw $t0, absoluteZeroState  	# If Absolute Zero is not active, switch to Yellow form
 beq $t0, 1, noYellowChange
 add $s7, $0, 2
 noYellowChange:
@@ -290,35 +292,35 @@ j keyPressed
 eraseAndRestart:
 j INITIALIZE
 
-boundedBelow:
+boundedBelow:			# Make sure ship doesn't go down off the screen
 addi $t8, $0, 47
 sub $t8, $t8, $s3
 lw $t2, yCoordinate
 ble $t2, $t8, moveDown
 j keyPressed
 
-boundedAbove:
+boundedAbove:			# Make sure ship doesn't go up off the screen
 addi $t8, $0, 0
 add $t8, $t8, $s3
 lw $t2, yCoordinate
 bge $t2, $t8, moveUp
 j keyPressed
 
-boundedLeft:
+boundedLeft:			# Make sure ship doesn't go left off the screen
 addi $t8, $0, 0
 add $t8, $t8, $s3
 lw $t1, xCoordinate
 bge $t1, $t8, moveLeft
 j keyPressed
 
-boundedRight:
+boundedRight:			# Make sure ship doesn't go right off the screen
 addi $t8, $0, 113
 sub $t8, $t8, $s3
 lw $t1, xCoordinate
 ble $t1, $t8, moveRight
 j keyPressed
 
-moveDown:
+moveDown:			# Makes ship go down while updating all required coordinates
 addi $t8, $0, 512
 mult $s3, $t8
 mflo $t7
@@ -330,7 +332,7 @@ add $t2, $t2, $s3
 sw $t2, yCoordinate
 j keyPressed
 
-moveUp:
+moveUp:				# Makes ship go up while updating all required coordinates
 addi $t8, $0, -512
 mult $s3, $t8
 mflo $t7
@@ -342,7 +344,7 @@ sub $t2, $t2, $s3
 sw $t2, yCoordinate
 j keyPressed
 
-moveRight: 
+moveRight: 			# Makes ship go right while updating all required coordinates
 addi $t8, $0, 4
 mult $s3, $t8
 mflo $t7
@@ -354,7 +356,7 @@ add $t1, $t1, $s3
 sw $t1, xCoordinate
 j keyPressed
 
-moveLeft: 
+moveLeft: 			# Makes ship go left while updating all required coordinates
 addi $t8, $0, -4
 mult $s3, $t8
 mflo $t7
@@ -366,7 +368,7 @@ sub $t1, $t1, $s3
 sw $t1, xCoordinate
 j keyPressed
 
-shoot:
+shoot:				# Shoots a laser from the ship's middle blaster if a laser is not currently active
 addi $t5, $s6, 0
 lw $t8, ($t5)
 bnez $t8, laserCurrentlyActive
@@ -540,17 +542,15 @@ sw $t7, 1024($t8)
 
 sw $t8, ($t5)
 addi $t5, $s0, 29748
-beq $t5, $t8, GAMEOVER
+beq $t5, $t8, GAMEOVER	# If ship takes too much damage, end the game
 
-######
 sw $t0, shipAddress
 jr $ra			# Return since laser can only hit 1 obstacle
 checkedAllObstacleShip:
 sw $t0, shipAddress
 jr $ra		
 
-
-drawLaser:
+drawLaser:		# Just draw/erase the laser
 addi $t5, $s6, 0
 lw $t8, ($t5)
 beqz $t8, noLasers
@@ -562,7 +562,7 @@ sw $a0, 16($t8)
 noLasers:
 jr $ra
 
-moveLaser:
+moveLaser:		# Update laser position over time if laser is present
 addi $t5, $s6, 0
 lw $t8, ($t5)
 beq $t8, 0, noLaserActive
@@ -586,7 +586,7 @@ mfhi $t7
 beq $t7, 0, eraseTheLaser
 beq $t7, 8, eraseTheLaser
 j laserStillActive
-eraseTheLaser:
+eraseTheLaser:		# Erase the laser
 sw $a0, 0($t8)
 sw $a0, 4($t8)
 sw $a0, 8($t8)
@@ -758,7 +758,7 @@ bnez $t5, noAsteroidToDespawn	# Only despawn if address is divisble by 512, as e
 bge $t7, 32, despawnHunter	# If index is 9 or greater, this is a FILLER
 bge $t7, 20, despawnBerserker	# If index is 5 or greater but less than 9, this is a berserker
 # Else, this must be an asteroid so just carry on
-# Erase the obstacle visually 
+# Erase the Asteroid visually 
 despawnAsteroid:
 sw $a0, 0($t9)
 sw $a0, 16($t9)
@@ -773,11 +773,11 @@ sw $a0, 1544($t9)
 sw $a0, 1548($t9)
 sw $a0, 2048($t9)
 sw $a0, 2064($t9)
-
 addi $t9, $0, 0		# Reset this obstacle to 0 in the obstacle array (and we don't need to mess with speed array since the arrays are parallel anyway)
 sw $t9, ($t8) 		# Store 0 into corresponding array element (i.e. reset the array at this index)
 j noAsteroidToDespawn
 
+# Erase the Berserker visually 
 despawnBerserker:
 sw $a0, 0($t9)
 sw $a0, 4($t9)
@@ -796,11 +796,11 @@ sw $a0, 1548($t9)
 sw $a0, 2048($t9)
 sw $a0, 2052($t9)
 sw $a0, 2064($t9)
-
 addi $t9, $0, 0		# Reset this obstacle to 0 in the obstacle array (and we don't need to mess with speed array since the arrays are parallel anyway)
 sw $t9, ($t8) 		# Store 0 into corresponding array element (i.e. reset the array at this index)
 j noAsteroidToDespawn
 
+# Erase the Hunter visually 
 despawnHunter:
 sw $a0, 0($t9)
 sw $a0, 4($t9)
@@ -856,15 +856,12 @@ sw $a0, 1544($t9)
 sw $a0, 1548($t9)
 sw $a0, 2048($t9)
 sw $a0, 2064($t9)
-
 noAsteroidToDraw:
 addi $t7, $t7, 4	# Go to next element in array
 j drawEachAsteroid
-
 finishedDrawingAsteroids:
 
-# start drawing berserkers
-
+# Start drawing berserkers
 drawEachBerserker:
 beq $t7, $t6, finishedDrawingBerserkers
 beq $t7, 32, finishedDrawingBerserkers # A game can have at most 3 berserkers.
@@ -889,11 +886,9 @@ sw $a1, 1548($t9)
 sw $a1, 2048($t9)
 sw $a1, 2052($t9)
 sw $a1, 2064($t9)
-
 noBerserkerToDraw:
 addi $t7, $t7, 4	# Go to next element in array
 j drawEachBerserker
-
 finishedDrawingBerserkers:
 
 drawEachHunter:
@@ -919,15 +914,11 @@ sw $a1, 2052($t9)
 sw $a1, 2056($t9)
 sw $a1, 2060($t9)
 sw $a1, 2064($t9)
-
 noHunterToDraw:
 addi $t7, $t7, 4	# Go to next element in array
 j drawEachHunter
-
 finishedDrawingHunters:
 jr $ra
-
-
 
 moveObstacles:
 addi $t7, $0, 0		# store indices
@@ -951,9 +942,7 @@ sw $t9, ($t8) 		# Store the corresponding new address into $t8
 noAsteroid:
 addi $t7, $t7, 4	# Go to next element in array
 j moveEachAsteroid
-
 movedAllAsteroids:
-
 moveEachBerserker:
 beq $t7, $t6, movedAllBerserkers
 beq $t7, 32, movedAllBerserkers # Can have at most 3 berserkers in a game
@@ -1026,8 +1015,8 @@ ble $t9, $0, noHunter	# If element is less than or equal to 0, this is an empty 
 lw $t0, shipAddress
 add $v0, $t0, 1024
 sub $v0, $t9, $v0
-bgt $v0, 0, huntUp
-blt $v0, 0, huntDown
+bgt $v0, 0, huntUp	# If Hunter's address minus the player's address is positive, hunt left and up
+blt $v0, 0, huntDown	# If Hunter's address minus the player's address is negative, hunt left and down
 
 huntUp:
 addi $t5, $0, -512
@@ -1094,15 +1083,14 @@ ble $t9, $0, loadInAddress	# If $t9 is less than or equal to 0, then this is an 
 add $t7, $t7, 4		# Go to next address in array
 j loopThroughObstacles
 
-loadInAddress: 	# we found an empty spot to load in our obstacle
+loadInAddress: 		# We found an empty spot to load in our obstacle
 sw $a0, ($t8)		# Store address of object into that empty slot in 'obstacles'
 getRandomSpeed:
 li $v0, 42 		# Service 42, random int range
 li $a0, 0		# Select random generator 0	
-li $a1, 2 		# Select upper bound of random number
+li $a1, 2 		# Select upper bound of random number (foes can have speed of 1 or 2)
 syscall	
 addi $a0, $a0, 1	# Add 1 so we don't generate speeds of 0
-#beq $a0, 3, getRandomSpeed	# If speed is 3, get another speed since game only allows speeds of 1,2, and 4
 sw $a0, ($t5)		# Load speed into speed array
 finishedLooping:
 jr $ra
@@ -1112,13 +1100,13 @@ addi $t5, $s6, 8	# Get index for Energy Bar element in 'otherAddresses'
 lw $t8, ($t5)		# Get address of current Energy bar and store it in $t8
 beq $t8, 1, fullyCharged
 addi $t8, $t8, 4
-lw $t7, energyBlue
+lw $t7, energyBlue	# Colour in the appropriate energy bar portion
 sw $t7, 0($t8)
 sw $t7, 512($t8)
 sw $t7, 1024($t8)
 sw $t8, ($t5)
 addi $t9, $s0, 30188
-blt $t8, $t9, fullyCharged 
+blt $t8, $t9, fullyCharged 	# If fully charged, no more colouring needed
 addi $t7, $0, 1
 sw $t7, ($t5)
 fullyCharged: 	# Energy is fully charged, so don't need to do anything
@@ -1178,7 +1166,7 @@ addi $t7, $s5, 0
 addi $t8, $0, 50
 mult $t7, $t8
 mflo $t7
-bgt $t3, $t7, levelUp
+bgt $t3, $t7, levelUp	# If a certain value is met, increase the game difficulty
 jr $ra
 
 levelUp:		# Increases game difficulty
@@ -1216,16 +1204,16 @@ DONE_ERASING:
 jr $ra
 
 drawShip:	# Draw the ship shape with the 2 inputted colors. $a0 is the primary color, $a1 is the secondary color
-### PAINTING
+# PAINTING
 lw $t0, shipAddress
-sw $a0, 0($t0)   # paint back tips of plane
+sw $a0, 0($t0)   # Paint back tips of plane
 sw $a0, 3072($t0)  
-# paint tail of plane
+# Paint tail of plane
 sw $a0, 4($t0)
 sw $a0, 516($t0)
 sw $a0, 2564($t0)
 sw $a0, 3076($t0)
-# paint tail of plane
+# Paint tail of plane
 sw $a0, 8($t0)
 sw $a0, 520($t0)
 sw $a0, 1032($t0)
@@ -1233,33 +1221,33 @@ sw $a0, 1544($t0)
 sw $a0, 2056($t0)
 sw $a0, 2568($t0)
 sw $a0, 3080($t0)
-# paint tail of plane
+# Paint tail of plane
 sw $a0, 524($t0)
 sw $a0, 1036($t0)
 sw $a0, 1548($t0)
 sw $a0, 2060($t0)
 sw $a0, 2572($t0)
-# paint tail body of plane
+# Paint tail body of plane
 sw $a0, 1040($t0)
 sw $a0, 1552($t0)
 sw $a0, 2064($t0)
-# paint tail body of plane
+# Paint tail body of plane
 sw $a0, 1044($t0)
 sw $a1, 1556($t0)
 sw $a0, 2068($t0)
-# paint body and tips of wings of plane
+# Paint body and tips of wings of plane
 sw $a0, 1048($t0)
 sw $a1, 1560($t0)
 sw $a0, 2072($t0)
-# paint body and wings of plane
+# Paint body and wings of plane
 sw $a0, 1052($t0)
 sw $a1, 1564($t0)
 sw $a0, 2076($t0)
-# paint body and wings of plane
+# Paint body and wings of plane
 sw $a0, 1056($t0)
 sw $a1, 1568($t0)
 sw $a0, 2080($t0)
-# paint head of plane
+# Paint head of plane
 sw $a0, 36($t0)
 sw $a0, 548($t0)
 sw $a0, 1060($t0)
@@ -1267,7 +1255,7 @@ sw $a1, 1572($t0)
 sw $a0, 2084($t0)
 sw $a0, 2596($t0)
 sw $a0, 3108($t0)
-# paint head of plane
+# Paint head of plane
 sw $a1, 40($t0)
 sw $a0, 552($t0)
 sw $a0, 1064($t0)
@@ -1275,19 +1263,19 @@ sw $a1, 1576($t0)
 sw $a0, 2088($t0)
 sw $a0, 2600($t0)
 sw $a1, 3112($t0)
-# paint head of plane
+# Paint head of plane
 sw $a1, 44($t0)
 sw $a0, 1068($t0)
 sw $a0, 1580($t0)
 sw $a0, 2092($t0)
 sw $a1, 3116($t0)
-# paint head of plane
+# Paint head of plane
 sw $a1, 48($t0)
 sw $a0, 1072($t0)
 sw $a0, 1584($t0)
 sw $a0, 2096($t0)
 sw $a1, 3120($t0)
-# paint tip of head of plane
+# Paint tip of head of plane
 sw $a1, 1588($t0)
 jr $ra
 
