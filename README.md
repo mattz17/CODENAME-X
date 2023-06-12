@@ -1,3 +1,5 @@
+![codenamex](https://github.com/mattz17/CODENAME-X/assets/47068683/bc54684a-69c0-48ec-ad6f-2b49abab61f2)
+
 CODENAME:X is a horizontal scrolling shoot-em-up game implemented in MIPS assembly language.
 
 Game Rules:
